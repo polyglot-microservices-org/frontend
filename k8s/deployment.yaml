@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: yaswanthmitta/multiapp-frontend:31d752597fa140a0a273591250da12295541daa4
+          image: yaswanthmitta/multiapp-frontend:879168c40dc92f7b1b802b02f03499611cae9b23
           ports:
             - containerPort: 80
           volumeMounts:
