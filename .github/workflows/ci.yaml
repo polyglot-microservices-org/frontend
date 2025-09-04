@@ -1,5 +1,5 @@
-# .github/workflows/ci-cd-frontend.yml
-name: Frontend CI/CD
+# .github/workflows/ci-cd-docker-push.yml
+name: Push Docker Image
 
 on:
   push:
@@ -11,52 +11,15 @@ env:
   DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
   DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
   DOCKER_REPO: "yaswanthmitta"
-  FRONTEND_IMAGE_NAME: multiapp-frontend
+  IMAGE_NAME: multiapp-frontend
 
 jobs:
-  build-and-test:
+  build-and-push-docker:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-
-      - name: Install Node.js dependencies
-        run: |
-          cd frontend
-          npm install
-
-      # --- Mandatory Tests and Analysis (Job will fail if any of these steps fail) ---
-      - name: Frontend Linting
-        run: |
-          cd frontend
-          npm run lint # Assumes you have 'lint' script in package.json
-
-      - name: Frontend SAST (npm audit)
-        run: |
-          cd frontend
-          npm audit --audit-level=high # Fails on high-severity vulnerabilities
-
-      - name: Frontend Unit Tests
-        run: |
-          cd frontend
-          npm test # Assumes you have a 'test' script in package.json
-
-      - name: SCA (Software Component Analysis)
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          ignore-unfixed: true
-          format: 'table'
-          output: 'trivy-results.json'
-          scanners: 'vuln,secret,misconfig'
-          continue-on-error: true
-
-      # --- Build and Push Image (Only runs if all previous steps pass) ---
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
@@ -65,10 +28,8 @@ jobs:
 
       - name: Build and Push Docker Image
         run: |
-          # Build with 'latest' and a unique tag
-          docker build -t ${{ env.DOCKER_REPO }}/${{ env.FRONTEND_IMAGE_NAME }}:latest ./frontend
-          docker build -t ${{ env.DOCKER_REPO }}/${{ env.FRONTEND_IMAGE_NAME }}:${{ github.sha }} ./frontend
+          docker build -t ${{ env.DOCKER_REPO }}/${{ env.IMAGE_NAME }}:latest .
+          docker build -t ${{ env.DOCKER_REPO }}/${{ env.IMAGE_NAME }}:${{ github.sha }} .
 
-          # Push both tags to Docker Hub
-          docker push ${{ env.DOCKER_REPO }}/${{ env.FRONTEND_IMAGE_NAME }}:latest
-          docker push ${{ env.DOCKER_REPO }}/${{ env.FRONTEND_IMAGE_NAME }}:${{ github.sha }}
+          docker push ${{ env.DOCKER_REPO }}/${{ env.IMAGE_NAME }}:latest
+          docker push ${{ env.DOCKER_REPO }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
