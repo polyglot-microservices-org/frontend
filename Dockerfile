@@ -4,13 +4,12 @@ FROM nginx:stable-alpine
 RUN rm /etc/nginx/conf.d/default.conf
 
 # Copy custom nginx config
-COPY nginx.conf /etc/nginx/nginx.conf
+COPY web/nginx.conf /etc/nginx/nginx.conf
 
 # Copy frontend static files
-COPY index.html /usr/share/nginx/html/
+COPY web/index.html /usr/share/nginx/html/
 
 EXPOSE 80
 
 # Single ENTRYPOINT
 ENTRYPOINT ["nginx", "-g", "daemon off;"]
-

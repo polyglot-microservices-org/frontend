@@ -1,0 +1,71 @@
+name: Frontend CI Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Install Dependencies
+        run: npm install
+
+      # --- Linting & Static Analysis (CI Linting & SAST) ---
+      - name: ESLint & SAST Scan
+        run: |
+          echo "Running ESLint for CI Linting..."
+          npx eslint .
+          echo "Running a basic SAST scan..."
+          # Replace with your specific SAST tool command if you have one
+          # Example: npx snyk test --all-projects
+        continue-on-error: true
+
+      # --- Software Component Analysis (SCA) ---
+      - name: SCA with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          format: 'table'
+          scanners: 'vuln,secret'
+        continue-on-error: true
+      
+      # --- Build & Unit Tests ---
+      - name: Run Unit Tests
+        run: |
+          echo "Running unit tests..."
+          # Replace with your actual test command, e.g., `npm test`
+          npm test
+
+      - name: Build Static Assets
+        run: |
+          echo "Building static assets..."
+          npm run build
+          
+      # --- Docker Image Creation & Push ---
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Create Docker Image
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/your-app-name:latest .
+
+      - name: Push to Docker Hub
+        run: |
+          docker push ${{ secrets.DOCKER_USERNAME }}/your-app-name:latest
