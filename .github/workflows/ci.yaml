@@ -1,8 +1,9 @@
-# .github/workflows/ci-cd-docker-push.yml
-name: Push Docker Image
+name: CI - Build & Push Docker Image
 
 on:
   push:
+    paths-ignore:
+      - 'k8s/**'   # ignore pure k8s changes
     branches:
       - '**'
   workflow_dispatch:
@@ -33,3 +34,4 @@ jobs:
 
           docker push ${{ env.DOCKER_REPO }}/${{ env.IMAGE_NAME }}:latest
           docker push ${{ env.DOCKER_REPO }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+

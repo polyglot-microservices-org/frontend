@@ -1,0 +1,27 @@
+name: CD - Rollout Restart Kubernetes
+
+on:
+  push:
+    paths:
+      - 'k8s/**'   # run only if k8s/ changes
+  workflow_run:
+    workflows: ["CI - Build & Push Docker Image"]   # run after CI finishes
+    types:
+      - completed
+  workflow_dispatch:
+
+jobs:
+  rollout-restart:
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    runs-on: self-hosted   # ubuntu@master runner
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Rollout restart workloads
+        run: |
+          kubectl rollout restart -f k8s/ -R
+
