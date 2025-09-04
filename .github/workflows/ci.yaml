@@ -1,71 +1,74 @@
-name: Frontend CI Pipeline
+# .github/workflows/ci-cd-frontend.yml
+name: Frontend CI/CD
 
 on:
   push:
     branches:
-      - main
-  pull_request:
-    branches:
-      - main
+      - '**'
+  workflow_dispatch:
+
+env:
+  DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+  DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+  DOCKER_REPO: "yaswanthmitta"
+  FRONTEND_IMAGE_NAME: multiapp-frontend
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Checkout Code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js Environment
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-      
-      - name: Install Dependencies
-        run: npm install
 
-      # --- Linting & Static Analysis (CI Linting & SAST) ---
-      - name: ESLint & SAST Scan
+      - name: Install Node.js dependencies
         run: |
-          echo "Running ESLint for CI Linting..."
-          npx eslint .
-          echo "Running a basic SAST scan..."
-          # Replace with your specific SAST tool command if you have one
-          # Example: npx snyk test --all-projects
-        continue-on-error: true
+          cd frontend
+          npm install
 
-      # --- Software Component Analysis (SCA) ---
-      - name: SCA with Trivy
+      # --- Mandatory Tests and Analysis (Job will fail if any of these steps fail) ---
+      - name: Frontend Linting
+        run: |
+          cd frontend
+          npm run lint # Assumes you have 'lint' script in package.json
+
+      - name: Frontend SAST (npm audit)
+        run: |
+          cd frontend
+          npm audit --audit-level=high # Fails on high-severity vulnerabilities
+
+      - name: Frontend Unit Tests
+        run: |
+          cd frontend
+          npm test # Assumes you have a 'test' script in package.json
+
+      - name: SCA (Software Component Analysis)
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'fs'
+          ignore-unfixed: true
           format: 'table'
-          scanners: 'vuln,secret'
-        continue-on-error: true
-      
-      # --- Build & Unit Tests ---
-      - name: Run Unit Tests
-        run: |
-          echo "Running unit tests..."
-          # Replace with your actual test command, e.g., `npm test`
-          npm test
+          output: 'trivy-results.json'
+          scanners: 'vuln,secret,misconfig'
+          continue-on-error: true
 
-      - name: Build Static Assets
-        run: |
-          echo "Building static assets..."
-          npm run build
-          
-      # --- Docker Image Creation & Push ---
+      # --- Build and Push Image (Only runs if all previous steps pass) ---
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_TOKEN }}
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ env.DOCKER_PASSWORD }}
 
-      - name: Create Docker Image
+      - name: Build and Push Docker Image
         run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/your-app-name:latest .
+          # Build with 'latest' and a unique tag
+          docker build -t ${{ env.DOCKER_REPO }}/${{ env.FRONTEND_IMAGE_NAME }}:latest ./frontend
+          docker build -t ${{ env.DOCKER_REPO }}/${{ env.FRONTEND_IMAGE_NAME }}:${{ github.sha }} ./frontend
 
-      - name: Push to Docker Hub
-        run: |
-          docker push ${{ secrets.DOCKER_USERNAME }}/your-app-name:latest
+          # Push both tags to Docker Hub
+          docker push ${{ env.DOCKER_REPO }}/${{ env.FRONTEND_IMAGE_NAME }}:latest
+          docker push ${{ env.DOCKER_REPO }}/${{ env.FRONTEND_IMAGE_NAME }}:${{ github.sha }}
