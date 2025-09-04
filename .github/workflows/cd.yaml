@@ -1,27 +1,36 @@
-name: CD - Rollout Restart Kubernetes
+name: CD - Deploy to Kubernetes
 
 on:
-  push:
-    paths:
-      - 'k8s/**'   # run only if k8s/ changes
   workflow_run:
-    workflows: ["CI - Build & Push Docker Image"]   # run after CI finishes
+    workflows: ["CI - Build & Push Docker Image"]
     types:
       - completed
+  push:
+    branches:
+      - '**'
+    paths:
+      - 'k8s/**'
   workflow_dispatch:
 
 jobs:
-  rollout-restart:
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
-    runs-on: self-hosted   # ubuntu@master runner
+  deploy:
+    # This ensures the job only runs on a successful CI completion or a direct push to k8s folder.
+    if: ${{ github.event.workflow_run.conclusion == 'success' }} || ${{ github.event_name == 'push' }} || ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: self-hosted
     steps:
       - name: Checkout repository
+        # Use the head SHA from the successful CI workflow run to get the correct commit
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
-      - name: Rollout restart workloads
+      - name: Update deployment manifest locally
+        # This step only runs if the workflow was triggered by a successful CI run
+        if: ${{ github.event.workflow_run.conclusion == 'success' }}
         run: |
-          kubectl rollout restart -f k8s/ -R
+          IMAGE_SHA="${{ github.event.workflow_run.head_sha }}"
+          sed -i "s|image: ${{ env.DOCKER_REPO }}/${{ env.IMAGE_NAME }}:.*|image: ${{ env.DOCKER_REPO }}/${{ env.IMAGE_NAME }}:${IMAGE_SHA}|g" k8s/deployment.yaml
 
+      - name: Deploy to Kubernetes
+        run: |
+          kubectl apply -fR k8s/

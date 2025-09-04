@@ -2,10 +2,12 @@ name: CI - Build & Push Docker Image
 
 on:
   push:
-    paths-ignore:
-      - 'k8s/**'   # ignore pure k8s changes
     branches:
       - '**'
+    paths:
+      - 'Dockerfile'
+      - 'docker-compose.yaml'
+      - 'web/**'
   workflow_dispatch:
 
 env:
@@ -27,11 +29,8 @@ jobs:
           username: ${{ env.DOCKER_USERNAME }}
           password: ${{ env.DOCKER_PASSWORD }}
 
-      - name: Build and Push Docker Image
+      - name: Build and push Docker image
         run: |
-          docker build -t ${{ env.DOCKER_REPO }}/${{ env.IMAGE_NAME }}:latest .
-          docker build -t ${{ env.DOCKER_REPO }}/${{ env.IMAGE_NAME }}:${{ github.sha }} .
-
-          docker push ${{ env.DOCKER_REPO }}/${{ env.IMAGE_NAME }}:latest
-          docker push ${{ env.DOCKER_REPO }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-
+          IMAGE_TAG="${{ env.DOCKER_REPO }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+          docker build -t $IMAGE_TAG .
+          docker push $IMAGE_TAG
