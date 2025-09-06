@@ -14,22 +14,13 @@ on:
 
 jobs:
   deploy:
-    # This ensures the job only runs on a successful CI completion or a direct push to k8s folder.
     if: ${{ github.event.workflow_run.conclusion == 'success' }} || ${{ github.event_name == 'push' }} || ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: self-hosted
     steps:
       - name: Checkout repository
-        # Use the head SHA from the successful CI workflow run to get the correct commit
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-
-      - name: Update deployment manifest locally
-        # This step only runs if the workflow was triggered by a successful CI run
-        if: ${{ github.event.workflow_run.conclusion == 'success' }}
-        run: |
-          IMAGE_SHA="${{ github.event.workflow_run.head_sha }}"
-          sed -i "s|image: ${{ env.DOCKER_REPO }}/${{ env.IMAGE_NAME }}:.*|image: ${{ env.DOCKER_REPO }}/${{ env.IMAGE_NAME }}:${IMAGE_SHA}|g" k8s/deployment.yaml
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Deploy to Kubernetes
         run: |
